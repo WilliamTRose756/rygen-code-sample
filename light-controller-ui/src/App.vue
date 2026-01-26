@@ -4,10 +4,19 @@ import axios from 'axios'
 const activeLight = ref<string>('red')
 
 const handleActiveLightChange = () => {
+
   axios.post('http://localhost:8080/intersections', { activeLight: activeLight.value })
     .then(console.log)
     .catch(console.error)
 }
+
+const activeLightTwo = ref('red')
+
+const handleActiveLightChangeTwo = () => {
+
+return
+}
+
 </script>
 
 <template>
@@ -18,23 +27,42 @@ const handleActiveLightChange = () => {
   </header>
 
   <main>
-    <div class="light-controller">
-      <div class="light">
-        <label>
-          <input type="radio" value="red" class="red" v-model="activeLight" name="light"
-            @change="handleActiveLightChange" /> Red
-        </label>
-        <label>
-          <input type="radio" value="yellow" class="yellow" v-model="activeLight" name="light"
-            @change="handleActiveLightChange" /> Yellow
-        </label>
-        <label>
-          <input type="radio" value="green" class="green" v-model="activeLight" name="light"
-            @change="handleActiveLightChange" /> Green
-        </label>
+    <div class="light-controllers-div">
+      <div class="light-controller">
+        <p>Active light One: {{ activeLight }}</p>
+        <div class="light">
+          <label>
+            <input type="radio" value="red" class="red" v-model="activeLight" name="light"
+              @change="handleActiveLightChange" /> Red
+          </label>
+          <label>
+            <input type="radio" value="yellow" class="yellow" v-model="activeLight" name="light"
+              @change="handleActiveLightChange" /> Yellow
+          </label>
+          <label>
+            <input type="radio" value="green" class="green" v-model="activeLight" name="light"
+              @change="handleActiveLightChange" /> Green
+          </label>
+        </div>
       </div>
 
-      <p>Active light: {{ activeLight }}</p>
+      <div class="light-two-controller">
+        <p>Active light Two: {{ activeLightTwo }}</p>
+        <div class="light-two">
+          <label>
+            <input type="radio" value="red" class="red" v-model="activeLightTwo" name="lightTwo"
+              @change="handleActiveLightChangeTwo" /> Red
+          </label>
+          <label>
+            <input type="radio" value="yellow" class="yellow" v-model="activeLightTwo" name="lightTwo"
+              @change="handleActiveLightChangeTwo" /> Yellow
+          </label>
+          <label>
+            <input type="radio" value="green" class="green" v-model="activeLightTwo" name="lightTwo"
+              @change="handleActiveLightChangeTwo" /> Green
+          </label>
+        </div>
+      </div>
     </div>
   </main>
 </template>
@@ -63,6 +91,14 @@ header {
   }
 }
 
+.light-controllers-div {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  justify-content: space-between;
+}
+
 .light-controller {
   display: grid;
   place-items: center;
@@ -73,6 +109,17 @@ header {
     gap: .5rem;
   }
 
+}
+
+.light-two-controller {
+display: grid;
+  place-items: center;
+  gap: 1rem;
+
+  .light-two {
+    display: grid;
+    gap: .5rem;
+  }
 }
 
 input[type='radio'].red {
