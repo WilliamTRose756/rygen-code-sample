@@ -1,9 +1,24 @@
 <script setup lang="ts">
-import { ref, computed, watch, onUnmounted } from 'vue'
+import { ref, computed, watch, onUnmounted, reactive } from 'vue'
 import axios from 'axios'
 
 const colors = ['green', 'yellow', 'red'] as const
 type LightColor = (typeof colors)[number]
+type LightPairId = 'roadA' | 'roadB'
+type LightPairConfig = {
+brightness: number // 1-3
+}
+
+const lightPairConfig = reactive<Record<LightPairId, LightPairConfig>>({
+roadA: { brightness: 2},
+roadB: { brightness: 2}
+})
+
+const brightnessToOpacity = (level: number) => {
+  if (level <= 1) return 0.4
+  if (level === 2) return 0.7
+  return 1
+}
 
 const activeLight = ref<LightColor>('green')
 const activeLightTwo = ref<LightColor>('red')
@@ -30,6 +45,7 @@ const advanceLight = (current: LightColor) => {
   return colors[nextIndex]
 }
 
+// decrement 
 const tickLights = () => {
  remainingLightOne.value -= 1
  if (remainingLightOne.value <=0) {
@@ -90,7 +106,7 @@ onUnmounted(() => {
       <h1>Intersection Light Controller</h1>
     </div>
   </header>
-
+  
   <main>
     <div class="power-control">
       <label class="switch">
@@ -99,42 +115,75 @@ onUnmounted(() => {
       </label>
       <span class="power-label">Power: {{ powerLabel }}</span>
     </div>
-    <div class="light-controllers-div">
-      <div class="light-controller">
-        <p> Light One</p>
-        <div class="light">
-          <label>
-            <input type="radio" value="red" class="red" v-model="activeLight" name="light"
-              @change="handleActiveLightChange" :disabled="!powerOn" /> Red
-          </label>
-          <label>
-            <input type="radio" value="yellow" class="yellow" v-model="activeLight" name="light"
-              @change="handleActiveLightChange" :disabled="!powerOn" /> Yellow
-          </label>
-          <label>
-            <input type="radio" value="green" class="green" v-model="activeLight" name="light"
-              @change="handleActiveLightChange" :disabled="!powerOn" /> Green
-          </label>
-        </div>
-      </div>
+  <div class="light-controllers-div">
+    <div class="light-column">
 
-      <div class="light-two-controller">
-        <p>Light Two</p>
-        <div class="light-two">
-          <label>
-            <input type="radio" value="red" class="red" v-model="activeLightTwo" name="lightTwo"
-              @change="handleActiveLightChangeTwo" :disabled="!powerOn" /> Red
-          </label>
-          <label>
-            <input type="radio" value="yellow" class="yellow" v-model="activeLightTwo" name="lightTwo"
-              @change="handleActiveLightChangeTwo" :disabled="!powerOn" /> Yellow
-          </label>
-          <label>
-            <input type="radio" value="green" class="green" v-model="activeLightTwo" name="lightTwo"
-              @change="handleActiveLightChangeTwo" :disabled="!powerOn" /> Green
-          </label>
-        </div>
+      <div class="brightness-control">
+        <label>
+          Brightness (1–3):
+          <input
+            type="range"
+            min="1"
+            max="3"
+            step="1"
+            v-model.number="lightPairConfig.roadA.brightness"
+          />
+        </label>
+        <span>{{ lightPairConfig.roadA.brightness }}</span>
       </div>
+        <div class="light-controller">
+          <p> Light Pair One</p>
+          <div class="light">
+            <label>
+              <input type="radio" value="red" class="red" v-model="activeLight" name="light"
+                @change="handleActiveLightChange" :disabled="!powerOn" /> Red
+            </label>
+            <label>
+              <input type="radio" value="yellow" class="yellow" v-model="activeLight" name="light"
+                @change="handleActiveLightChange" :disabled="!powerOn" /> Yellow
+            </label>
+            <label>
+              <input type="radio" value="green" class="green" v-model="activeLight" name="light"
+                @change="handleActiveLightChange" :disabled="!powerOn" /> Green
+            </label>
+          </div>
+        </div>
+    </div>
+    <div>
+
+    </div>
+    <div class="light-column">
+      <div class="brightness-control">
+  <label>
+    Brightness (1–3):
+    <input
+      type="range"
+      min="1"
+      max="3"
+      step="1"
+      v-model.number="lightPairConfig.roadB.brightness"
+    />
+  </label>
+  <span>{{ lightPairConfig.roadB.brightness }}</span>
+  </div>
+        <div class="light-two-controller">
+          <p>Light Pair Two</p>
+          <div class="light-two">
+            <label>
+              <input type="radio" value="red" class="red" v-model="activeLightTwo" name="lightTwo"
+                @change="handleActiveLightChangeTwo" :disabled="!powerOn" /> Red
+            </label>
+            <label>
+              <input type="radio" value="yellow" class="yellow" v-model="activeLightTwo" name="lightTwo"
+                @change="handleActiveLightChangeTwo" :disabled="!powerOn" /> Yellow
+            </label>
+            <label>
+              <input type="radio" value="green" class="green" v-model="activeLightTwo" name="lightTwo"
+                @change="handleActiveLightChangeTwo" :disabled="!powerOn" /> Green
+            </label>
+          </div>
+        </div>
+    </div>
     </div>
   </main>
 </template>
@@ -262,4 +311,26 @@ input[type='radio'].green {
 .switch input:checked + .slider::before {
   transform: translateX(28px);
 }
-</style>
+
+.brightness-control {
+  display: grid;
+  gap: 0.4rem;
+  width: 220px;
+}
+
+.brightness-control label {
+  font-weight: 600;
+}
+
+.brightness-control input[type="range"] {
+  width: 100%;
+  accent-color: #2dc937;
+}
+
+.brightness-control span {
+  font-size: 0.9rem;
+  color: #666;
+}
+
+</style
+

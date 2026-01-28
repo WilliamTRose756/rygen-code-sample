@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:all": "run-p dev backend",
     "build": "run-p type-check \"build-only {@}\" --",
+    "backend": "cd .. && gradlew bootRun",
     "preview": "vite preview",
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
