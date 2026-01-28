@@ -1,24 +1,87 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import axios from 'axios'
 
-const activeLight = ref<string>('green')
-const activeLightTwo = ref('red')
+const colors = ['green', 'yellow', 'red'] as const
+type LightColor = (typeof colors)[number]
+
+const activeLight = ref<LightColor>('green')
+const activeLightTwo = ref<LightColor>('red')
 
 const powerOn = ref(false)
+const powerLabel = computed(() => (powerOn.value ? 'ON' : 'OFF'))
+
+const stoplightConfiguration: Record<LightColor, number> = {
+  "green":4,
+  "yellow": 2,
+  "red": 6
+}
+
+const remainingLightOne = ref<number>(stoplightConfiguration[activeLight.value])
+const remainingLightTwo = ref<number>(stoplightConfiguration[activeLightTwo.value])
+
+const tickMs = 1000
+let cycleTimer: number | undefined
+
+// Iterate over  light cycle
+const advanceLight = (current: LightColor) => {
+  const currentIndex = colors.indexOf(current)
+  const nextIndex = (currentIndex + 1) % colors.length
+  return colors[nextIndex]
+}
+
+const tickLights = () => {
+ remainingLightOne.value -= 1
+ if (remainingLightOne.value <=0) {
+  activeLight.value = advanceLight(activeLight.value)
+  remainingLightOne.value = stoplightConfiguration[activeLight.value]
+ }
+
+ remainingLightTwo.value -= 1
+ if (remainingLightTwo.value <=0) {
+  activeLightTwo.value = advanceLight(activeLightTwo.value)
+  remainingLightTwo.value = stoplightConfiguration[activeLightTwo.value]
+ }
+}
+
+// call tickLights() every tick to update remaining time
+const startCycle = () => {
+if (cycleTimer !== undefined) return
+cycleTimer = window.setInterval(tickLights, tickMs)
+
+}
+
+// clears  interval to stop, then reset cycleTimer
+const stopCycle = () => {
+  if (cycleTimer === undefined) return
+  window.clearInterval(cycleTimer)
+  cycleTimer = undefined
+}
+
 const handleActiveLightChange = () => {
   if (!powerOn.value) return
 
-  axios.post('http://localhost:8080/intersections', { activeLight: activeLight.value })
+  axios
+    .post('http://localhost:8080/intersections', { activeLight: activeLight.value })
     .then(console.log)
     .catch(console.error)
 }
 
 const handleActiveLightChangeTwo = () => {
-
-return
+  return
 }
 
+watch(powerOn, (isOn) => {
+  if (isOn) {
+    startCycle()
+    return
+  }
+  stopCycle()
+})
+
+onUnmounted(() => {
+  stopCycle()
+})
 </script>
 
 <template>
@@ -38,7 +101,7 @@ return
     </div>
     <div class="light-controllers-div">
       <div class="light-controller">
-        <p>Active light One: {{ powerOn ? activeLight : 'OFF' }}</p>
+        <p> Light One</p>
         <div class="light">
           <label>
             <input type="radio" value="red" class="red" v-model="activeLight" name="light"
@@ -56,7 +119,7 @@ return
       </div>
 
       <div class="light-two-controller">
-        <p>Active light Two: {{ powerOn ? activeLightTwo : 'OFF' }}</p>
+        <p>Light Two</p>
         <div class="light-two">
           <label>
             <input type="radio" value="red" class="red" v-model="activeLightTwo" name="lightTwo"
