@@ -1,19 +1,44 @@
 <script setup lang="ts">
-import { ref, computed, watch, onUnmounted, reactive } from 'vue'
+import { ref, computed, watch, onUnmounted, onMounted, reactive } from 'vue'
 import axios from 'axios'
 
-const colors = ['green', 'yellow', 'red'] as const
-const lightPairConfig = reactive<Record<LightPairId, LightPairConfig>>({
-  roadA: { brightness: 2 },
-  roadB: { brightness: 2 },
+type SpeedSetting = 'slow' | 'medium' | 'fast'
+type LightPairId = 'roadA' | 'roadB'
+
+type ConfigurationObject = {
+  powerOn: boolean
+  speed: SpeedSetting
+  lightBrightness: Record<LightPairId, number> //1-3
+}
+
+const config = reactive<ConfigurationObject>({
+  powerOn: true,
+  speed: 'medium',
+  lightBrightness: { roadA: 2, roadB: 2 },
 })
+
+const powerOn = computed({
+  get: () => config.powerOn,
+  set: (v: boolean) => {
+    config.powerOn = v
+  },
+})
+
+const speedSetting = computed({
+  get: () => (config.speed === 'slow' ? 1 : config.speed === 'medium' ? 2 : 3),
+  set: (v: number) => {
+    config.speed = v <= 1 ? 'slow' : v === 2 ? 'medium' : 'fast'
+  },
+})
+
+const colors = ['green', 'yellow', 'red'] as const
+type LightColor = (typeof colors)[number]
 const activeLight = ref<LightColor>('green')
 const activeLightTwo = ref<LightColor>('red')
-const powerOn = ref(false)
 const powerLabel = computed(() => (powerOn.value ? 'ON' : 'OFF'))
 
 type SpeedKey = 'slow' | 'medium' | 'fast'
-const speedSetting = ref<number>(2)
+// const speedSetting = ref<number>(2)
 const speedConfig: Record<SpeedKey, number> = {
   slow: 2,
   medium: 1,
@@ -24,6 +49,7 @@ const speedKey = computed<SpeedKey>(() => {
   if (speedSetting.value === 2) return 'medium'
   return 'fast'
 })
+
 const currentSpeedFactor = () => speedConfig[speedKey.value]
 const lastSpeedFactor = ref<number>(currentSpeedFactor())
 
@@ -40,12 +66,6 @@ const remainingLightOne = ref<number>(getDurationSeconds(activeLight.value))
 const remainingLightTwo = ref<number>(getDurationSeconds(activeLightTwo.value))
 const tickMs = 1000
 let cycleTimer: number | undefined
-
-type LightColor = (typeof colors)[number]
-type LightPairId = 'roadA' | 'roadB'
-type LightPairConfig = {
-  brightness: number // 1-3
-}
 
 const brightnessToOpacity = (level: number) => {
   if (level <= 1) return 0.4
@@ -112,6 +132,7 @@ onUnmounted(() => {
   stopCycle()
 })
 
+// scale remaing time, keep in sync, and maintain timing ratio
 watch(speedKey, () => {
   const newFactor = currentSpeedFactor()
   const ratio = newFactor / lastSpeedFactor.value
@@ -163,7 +184,7 @@ watch(speedKey, () => {
                 min="1"
                 max="3"
                 step="1"
-                v-model.number="lightPairConfig.roadA.brightness"
+                v-model.number="config.lightBrightness.roadA"
               />
             </label>
           </div>
@@ -175,7 +196,7 @@ watch(speedKey, () => {
                   :style="{
                     opacity:
                       powerOn && activeLight === 'red'
-                        ? brightnessToOpacity(lightPairConfig.roadA.brightness)
+                        ? brightnessToOpacity(config.lightBrightness.roadA)
                         : 1,
                   }"
                   type="radio"
@@ -194,7 +215,7 @@ watch(speedKey, () => {
                   :style="{
                     opacity:
                       powerOn && activeLight === 'yellow'
-                        ? brightnessToOpacity(lightPairConfig.roadA.brightness)
+                        ? brightnessToOpacity(config.lightBrightness.roadA)
                         : 1,
                   }"
                   type="radio"
@@ -214,7 +235,7 @@ watch(speedKey, () => {
                   :style="{
                     opacity:
                       powerOn && activeLight === 'green'
-                        ? brightnessToOpacity(lightPairConfig.roadA.brightness)
+                        ? brightnessToOpacity(config.lightBrightness.roadA)
                         : 1,
                   }"
                   type="radio"
@@ -240,7 +261,7 @@ watch(speedKey, () => {
                 min="1"
                 max="3"
                 step="1"
-                v-model.number="lightPairConfig.roadB.brightness"
+                v-model.number="config.lightBrightness.roadB"
               />
             </label>
           </div>
@@ -252,7 +273,7 @@ watch(speedKey, () => {
                   :style="{
                     opacity:
                       powerOn && activeLightTwo === 'red'
-                        ? brightnessToOpacity(lightPairConfig.roadB.brightness)
+                        ? brightnessToOpacity(config.lightBrightness.roadB)
                         : 1,
                   }"
                   type="radio"
@@ -271,7 +292,7 @@ watch(speedKey, () => {
                   :style="{
                     opacity:
                       powerOn && activeLightTwo === 'yellow'
-                        ? brightnessToOpacity(lightPairConfig.roadB.brightness)
+                        ? brightnessToOpacity(config.lightBrightness.roadB)
                         : 1,
                   }"
                   type="radio"
@@ -291,7 +312,7 @@ watch(speedKey, () => {
                   :style="{
                     opacity:
                       powerOn && activeLightTwo === 'green'
-                        ? brightnessToOpacity(lightPairConfig.roadB.brightness)
+                        ? brightnessToOpacity(config.lightBrightness.roadB)
                         : 1,
                   }"
                   type="radio"
