@@ -25,6 +25,10 @@ const isSaving = ref(false)
 const saveError = ref<string | null>(null)
 const saveSuccess = ref<string | null>(null)
 let saveSuccessTimer: number | undefined
+const showConfigModal = ref(false)
+const modalConfig = ref<ConfigurationObject | null>(null)
+const modalLoading = ref(false)
+const modalError = ref<string | null>(null)
 const hasUnsavedChanges = computed(
   () => JSON.stringify(cloneConfig(config)) !== JSON.stringify(lastSavedConfig.value),
 )
@@ -54,6 +58,25 @@ const saveConfig = async () => {
   } finally {
     isSaving.value = false
   }
+}
+
+const openConfigModal = async () => {
+  showConfigModal.value = true
+  modalLoading.value = true
+  modalError.value = null
+  try {
+    const res = await axios.get('http://localhost:8080/config')
+    modalConfig.value = res.data
+  } catch (error) {
+    modalError.value = 'Could not load current configuration.'
+    console.error(error)
+  } finally {
+    modalLoading.value = false
+  }
+}
+
+const closeConfigModal = () => {
+  showConfigModal.value = false
 }
 
 onMounted(async () => {
@@ -220,6 +243,11 @@ const handleBeforeUnload = (event: BeforeUnloadEvent) => {
   </header>
 
   <main>
+    <div class="current-config-control">
+      <button type="button" class="current-config-button" @click="openConfigModal">
+        Current Saved Configuration
+      </button>
+    </div>
     <div class="main-controls">
       <label class="main-controls-label" style="margin-bottom: 5%" for="main-controls"
         >Main Controls:</label
@@ -412,6 +440,37 @@ const handleBeforeUnload = (event: BeforeUnloadEvent) => {
       <p v-if="hasUnsavedChanges" class="unsaved-warning">Unsaved changes</p>
       <p v-if="saveSuccess" class="save-success">{{ saveSuccess }}</p>
       <p v-if="saveError" class="save-error">{{ saveError }}</p>
+    </div>
+
+    <div v-if="showConfigModal" class="modal-backdrop" @click.self="closeConfigModal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2>Current Saved Configuration</h2>
+          <button type="button" class="modal-close" @click="closeConfigModal">×</button>
+        </div>
+        <div class="modal-body">
+          <p v-if="modalLoading">Loading...</p>
+          <p v-else-if="modalError" class="save-error">{{ modalError }}</p>
+          <div v-else-if="modalConfig" class="modal-grid">
+            <div>
+              <span class="modal-label">Power</span>
+              <span>{{ modalConfig.powerOn ? 'ON' : 'OFF' }}</span>
+            </div>
+            <div>
+              <span class="modal-label">Speed</span>
+              <span>{{ modalConfig.speed }}</span>
+            </div>
+            <div>
+              <span class="modal-label">Road A Brightness</span>
+              <span>{{ modalConfig.lightBrightness.roadA }}</span>
+            </div>
+            <div>
+              <span class="modal-label">Road B Brightness</span>
+              <span>{{ modalConfig.lightBrightness.roadB }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </main>
 </template>
@@ -625,6 +684,35 @@ input[type='radio'].green {
   color: #666;
 }
 
+/* Current config button */
+.current-config-control {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  margin-bottom: 3%;
+}
+
+.current-config-button {
+  padding: 0.6rem 1.2rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  border: 1px solid #d0d7de;
+  border-radius: 8px;
+  background: #f9fbfc;
+  color: #2c3e50;
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
+}
+
+.current-config-button:hover {
+  transform: translateY(-1px);
+  background: #eef2f5;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
 /* Save button */
 .save-control {
   display: flex;
@@ -686,5 +774,67 @@ input[type='radio'].green {
   padding: 0.35rem 0.9rem;
   font-size: 0.85rem;
   font-weight: 600;
+}
+
+/* Modal */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: grid;
+  place-items: center;
+  z-index: 50;
+}
+
+.modal-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px 22px;
+  width: min(420px, 90vw);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.18),
+    0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.modal-header h2 {
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+.modal-close {
+  border: none;
+  background: transparent;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  color: #666;
+}
+
+.modal-body {
+  display: grid;
+  gap: 10px;
+}
+
+.modal-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.modal-grid > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.modal-label {
+  font-weight: 600;
+  color: #4a5568;
 }
 </style>
