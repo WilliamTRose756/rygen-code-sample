@@ -212,7 +212,7 @@ const handleBeforeUnload = (event: BeforeUnloadEvent) => {
 </script>
 
 <template>
-  <header>
+  <header style="margin: 10px">
     <div class="wrapper">
       <h1>Intersection Light Controller</h1>
     </div>
