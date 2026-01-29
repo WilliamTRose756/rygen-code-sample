@@ -607,6 +607,11 @@ header {
   }
 }
 
+.light-controller p,
+.light-two-controller p {
+  font-weight: 600;
+}
+
 .light-two-controller {
   display: grid;
   place-items: center;
@@ -616,6 +621,21 @@ header {
     display: grid;
     gap: 0.5rem;
   }
+}
+
+.light label,
+.light-two label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  line-height: 1.1;
+}
+
+input[type='radio'] {
+  margin: 0;
+  /* transform: scale(1.15); */
+  transform: scale(1.3);
+  transform-origin: center;
 }
 
 input[type='radio'].red {
