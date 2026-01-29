@@ -3,41 +3,55 @@ import { ref, computed, watch, onUnmounted, reactive } from 'vue'
 import axios from 'axios'
 
 const colors = ['green', 'yellow', 'red'] as const
+const lightPairConfig = reactive<Record<LightPairId, LightPairConfig>>({
+  roadA: { brightness: 2 },
+  roadB: { brightness: 2 },
+})
+const activeLight = ref<LightColor>('green')
+const activeLightTwo = ref<LightColor>('red')
+const powerOn = ref(false)
+const powerLabel = computed(() => (powerOn.value ? 'ON' : 'OFF'))
+
+type SpeedKey = 'slow' | 'medium' | 'fast'
+const speedSetting = ref<number>(2)
+const speedConfig: Record<SpeedKey, number> = {
+  slow: 2,
+  medium: 1,
+  fast: 0.5,
+}
+const speedKey = computed<SpeedKey>(() => {
+  if (speedSetting.value <= 1) return 'slow'
+  if (speedSetting.value === 2) return 'medium'
+  return 'fast'
+})
+const currentSpeedFactor = () => speedConfig[speedKey.value]
+const lastSpeedFactor = ref<number>(currentSpeedFactor())
+
+const stoplightConfiguration: Record<LightColor, number> = {
+  green: 4,
+  yellow: 2,
+  red: 6,
+}
+
+const getDurationSeconds = (color: LightColor) =>
+  Math.max(1, Math.round(stoplightConfiguration[color] * speedConfig[speedKey.value]))
+
+const remainingLightOne = ref<number>(getDurationSeconds(activeLight.value))
+const remainingLightTwo = ref<number>(getDurationSeconds(activeLightTwo.value))
+const tickMs = 1000
+let cycleTimer: number | undefined
+
 type LightColor = (typeof colors)[number]
 type LightPairId = 'roadA' | 'roadB'
 type LightPairConfig = {
-brightness: number // 1-3
+  brightness: number // 1-3
 }
-
-const lightPairConfig = reactive<Record<LightPairId, LightPairConfig>>({
-roadA: { brightness: 2},
-roadB: { brightness: 2}
-})
 
 const brightnessToOpacity = (level: number) => {
   if (level <= 1) return 0.4
   if (level === 2) return 0.7
   return 1
 }
-
-const activeLight = ref<LightColor>('green')
-const activeLightTwo = ref<LightColor>('red')
-
-const powerOn = ref(false)
-const powerLabel = computed(() => (powerOn.value ? 'ON' : 'OFF'))
-
-const stoplightConfiguration: Record<LightColor, number> = {
-  "green":4,
-  "yellow": 2,
-  "red": 6
-}
-
-const remainingLightOne = ref<number>(stoplightConfiguration[activeLight.value])
-const remainingLightTwo = ref<number>(stoplightConfiguration[activeLightTwo.value])
-
-const tickMs = 1000
-let cycleTimer: number | undefined
-
 // Iterate over  light cycle
 const advanceLight = (current: LightColor) => {
   const currentIndex = colors.indexOf(current)
@@ -45,26 +59,25 @@ const advanceLight = (current: LightColor) => {
   return colors[nextIndex]
 }
 
-// decrement 
+// decrement
 const tickLights = () => {
- remainingLightOne.value -= 1
- if (remainingLightOne.value <=0) {
-  activeLight.value = advanceLight(activeLight.value)
-  remainingLightOne.value = stoplightConfiguration[activeLight.value]
- }
+  remainingLightOne.value -= 1
+  if (remainingLightOne.value <= 0) {
+    activeLight.value = advanceLight(activeLight.value)
+    remainingLightOne.value = getDurationSeconds(activeLight.value)
+  }
 
- remainingLightTwo.value -= 1
- if (remainingLightTwo.value <=0) {
-  activeLightTwo.value = advanceLight(activeLightTwo.value)
-  remainingLightTwo.value = stoplightConfiguration[activeLightTwo.value]
- }
+  remainingLightTwo.value -= 1
+  if (remainingLightTwo.value <= 0) {
+    activeLightTwo.value = advanceLight(activeLightTwo.value)
+    remainingLightTwo.value = getDurationSeconds(activeLightTwo.value)
+  }
 }
 
 // call tickLights() every tick to update remaining time
 const startCycle = () => {
-if (cycleTimer !== undefined) return
-cycleTimer = window.setInterval(tickLights, tickMs)
-
+  if (cycleTimer !== undefined) return
+  cycleTimer = window.setInterval(tickLights, tickMs)
 }
 
 // clears  interval to stop, then reset cycleTimer
@@ -98,6 +111,14 @@ watch(powerOn, (isOn) => {
 onUnmounted(() => {
   stopCycle()
 })
+
+watch(speedKey, () => {
+  const newFactor = currentSpeedFactor()
+  const ratio = newFactor / lastSpeedFactor.value
+  remainingLightOne.value = Math.max(1, Math.round(remainingLightOne.value * ratio))
+  remainingLightTwo.value = Math.max(1, Math.round(remainingLightTwo.value * ratio))
+  lastSpeedFactor.value = newFactor
+})
 </script>
 
 <template>
@@ -106,84 +127,187 @@ onUnmounted(() => {
       <h1>Intersection Light Controller</h1>
     </div>
   </header>
-  
+
   <main>
-    <div class="power-control">
-      <label class="switch">
-        <input type="checkbox" v-model="powerOn" />
-        <span class="slider"></span>
-      </label>
-      <span class="power-label">Power: {{ powerLabel }}</span>
-    </div>
-  <div class="light-controllers-div">
-    <div class="light-column">
-
-      <div class="brightness-control">
-        <label>
-          Brightness (1–3):
-          <input
-            type="range"
-            min="1"
-            max="3"
-            step="1"
-            v-model.number="lightPairConfig.roadA.brightness"
-          />
-        </label>
-        <span>{{ lightPairConfig.roadA.brightness }}</span>
+    <div class="main-controls">
+      <label class="main-controls-label" style="margin-bottom: 5%" for="main-controls"
+        >Main Controls:</label
+      >
+      <div class="main-controls-box">
+        <div class="power-control">
+          <label class="switch">
+            <input type="checkbox" v-model="powerOn" />
+            <span class="slider"></span>
+          </label>
+          <span class="power-label">Power: {{ powerLabel }}</span>
+        </div>
+        <div class="speed-control">
+          <div class="speed-control">
+            <label>
+              Speed (Slow, Medium, Fast)
+              <input type="range" min="1" max="3" step="1" v-model.number="speedSetting" />
+            </label>
+          </div>
+        </div>
       </div>
-        <div class="light-controller">
-          <p> Light Pair One</p>
-          <div class="light">
+    </div>
+    <div class="light-controllers-div">
+      <label class="main-controls-label">Lights:</label>
+      <div class="lights-box">
+        <div class="light-column">
+          <div class="brightness-control">
             <label>
-              <input type="radio" value="red" class="red" v-model="activeLight" name="light"
-                @change="handleActiveLightChange" :disabled="!powerOn" /> Red
-            </label>
-            <label>
-              <input type="radio" value="yellow" class="yellow" v-model="activeLight" name="light"
-                @change="handleActiveLightChange" :disabled="!powerOn" /> Yellow
-            </label>
-            <label>
-              <input type="radio" value="green" class="green" v-model="activeLight" name="light"
-                @change="handleActiveLightChange" :disabled="!powerOn" /> Green
+              Brightness (1–3):
+              <input
+                type="range"
+                min="1"
+                max="3"
+                step="1"
+                v-model.number="lightPairConfig.roadA.brightness"
+              />
             </label>
           </div>
-        </div>
-    </div>
-    <div>
-
-    </div>
-    <div class="light-column">
-      <div class="brightness-control">
-  <label>
-    Brightness (1–3):
-    <input
-      type="range"
-      min="1"
-      max="3"
-      step="1"
-      v-model.number="lightPairConfig.roadB.brightness"
-    />
-  </label>
-  <span>{{ lightPairConfig.roadB.brightness }}</span>
-  </div>
-        <div class="light-two-controller">
-          <p>Light Pair Two</p>
-          <div class="light-two">
-            <label>
-              <input type="radio" value="red" class="red" v-model="activeLightTwo" name="lightTwo"
-                @change="handleActiveLightChangeTwo" :disabled="!powerOn" /> Red
-            </label>
-            <label>
-              <input type="radio" value="yellow" class="yellow" v-model="activeLightTwo" name="lightTwo"
-                @change="handleActiveLightChangeTwo" :disabled="!powerOn" /> Yellow
-            </label>
-            <label>
-              <input type="radio" value="green" class="green" v-model="activeLightTwo" name="lightTwo"
-                @change="handleActiveLightChangeTwo" :disabled="!powerOn" /> Green
-            </label>
+          <div class="light-controller">
+            <p>Light Pair One</p>
+            <div class="light">
+              <label>
+                <input
+                  :style="{
+                    opacity:
+                      powerOn && activeLight === 'red'
+                        ? brightnessToOpacity(lightPairConfig.roadA.brightness)
+                        : 1,
+                  }"
+                  type="radio"
+                  value="red"
+                  class="red"
+                  v-model="activeLight"
+                  name="light"
+                  @change="handleActiveLightChange"
+                  :disabled="!powerOn"
+                  @click.prevent
+                />
+                Red
+              </label>
+              <label>
+                <input
+                  :style="{
+                    opacity:
+                      powerOn && activeLight === 'yellow'
+                        ? brightnessToOpacity(lightPairConfig.roadA.brightness)
+                        : 1,
+                  }"
+                  type="radio"
+                  value="yellow"
+                  class="yellow"
+                  v-model="activeLight"
+                  name="light"
+                  @change="handleActiveLightChange"
+                  :disabled="!powerOn"
+                  @click.prevent
+                />
+                Yellow
+              </label>
+              <label>
+                <input
+                  class="radio-brightness-green"
+                  :style="{
+                    opacity:
+                      powerOn && activeLight === 'green'
+                        ? brightnessToOpacity(lightPairConfig.roadA.brightness)
+                        : 1,
+                  }"
+                  type="radio"
+                  value="green"
+                  v-model="activeLight"
+                  name="light"
+                  @change="handleActiveLightChange"
+                  :disabled="!powerOn"
+                  @click.prevent
+                />
+                Green
+              </label>
+            </div>
           </div>
         </div>
-    </div>
+        <div></div>
+        <div class="light-column">
+          <div class="brightness-control">
+            <label>
+              Brightness (1–3):
+              <input
+                type="range"
+                min="1"
+                max="3"
+                step="1"
+                v-model.number="lightPairConfig.roadB.brightness"
+              />
+            </label>
+          </div>
+          <div class="light-two-controller">
+            <p>Light Pair Two</p>
+            <div class="light-two">
+              <label>
+                <input
+                  :style="{
+                    opacity:
+                      powerOn && activeLightTwo === 'red'
+                        ? brightnessToOpacity(lightPairConfig.roadB.brightness)
+                        : 1,
+                  }"
+                  type="radio"
+                  value="red"
+                  class="red"
+                  v-model="activeLightTwo"
+                  name="lightTwo"
+                  @change="handleActiveLightChange"
+                  :disabled="!powerOn"
+                  @click.prevent
+                />
+                Red
+              </label>
+              <label>
+                <input
+                  :style="{
+                    opacity:
+                      powerOn && activeLightTwo === 'yellow'
+                        ? brightnessToOpacity(lightPairConfig.roadB.brightness)
+                        : 1,
+                  }"
+                  type="radio"
+                  value="yellow"
+                  class="yellow"
+                  v-model="activeLightTwo"
+                  name="lightTwo"
+                  @change="handleActiveLightChange"
+                  :disabled="!powerOn"
+                  @click.prevent
+                />
+                Yellow
+              </label>
+              <label>
+                <input
+                  class="radio-brightness-green"
+                  :style="{
+                    opacity:
+                      powerOn && activeLightTwo === 'green'
+                        ? brightnessToOpacity(lightPairConfig.roadB.brightness)
+                        : 1,
+                  }"
+                  type="radio"
+                  value="green"
+                  v-model="activeLightTwo"
+                  name="lightTwo"
+                  @change="handleActiveLightChange"
+                  :disabled="!powerOn"
+                  @click.prevent
+                />
+                Green
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </main>
 </template>
@@ -191,6 +315,9 @@ onUnmounted(() => {
 <style scoped>
 header {
   line-height: 1.5;
+}
+.wrapper {
+  text-align: center;
 }
 
 .logo {
@@ -200,62 +327,40 @@ header {
 
 @media (min-width: 1024px) {
   header {
-    display: flex;
-    place-items: center;
     margin: calc(var(--section-gap) / 4);
   }
 
-  header .wrapper {
-    display: flex;
-    place-items: flex-start;
-    flex-wrap: wrap;
+  .wrapper {
+    text-align: center;
   }
 }
 
-.light-controllers-div {
+/* Main Controls Box */
+.main-controls {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 10%;
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.12),
+    0 1px 2px rgba(0, 0, 0, 0.24);
+}
+.main-controls-label {
+  font-family: inherit;
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 5%;
+}
+
+.main-controls-box {
   display: flex;
   flex-direction: row;
-  flex-wrap: wrap;
-  gap: 1.5rem;
   justify-content: space-between;
 }
 
-.light-controller {
-  display: grid;
-  place-items: center;
-  gap: 1rem;
-
-  .light {
-    display: grid;
-    gap: .5rem;
-  }
-
-}
-
-.light-two-controller {
-display: grid;
-  place-items: center;
-  gap: 1rem;
-
-  .light-two {
-    display: grid;
-    gap: .5rem;
-  }
-}
-
-input[type='radio'].red {
-  accent-color: #cc3232;
-}
-
-input[type='radio'].yellow {
-  accent-color: #e7b416;
-}
-
-input[type='radio'].green {
-  accent-color: #2dc937;
-}
-
-
+/* Power Switch */
 .power-control {
   display: flex;
   align-items: center;
@@ -294,7 +399,7 @@ input[type='radio'].green {
 
 .slider::before {
   position: absolute;
-  content: "";
+  content: '';
   height: 22px;
   width: 22px;
   left: 3px;
@@ -303,7 +408,6 @@ input[type='radio'].green {
   transition: 0.2s;
   border-radius: 50%;
 }
-
 .switch input:checked + .slider {
   background-color: #2dc937;
 }
@@ -312,19 +416,83 @@ input[type='radio'].green {
   transform: translateX(28px);
 }
 
+/* Lights Box */
+.light-controllers-div {
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.12),
+    0 1px 2px rgba(0, 0, 0, 0.24);
+}
+
+/* Lights */
+
+.lights-column {
+  max-width: 50%;
+}
+.light-controller {
+  display: grid;
+  place-items: center;
+  gap: 1rem;
+
+  .light {
+    display: grid;
+    gap: 0.5rem;
+  }
+}
+
+.light-two-controller {
+  display: grid;
+  place-items: center;
+  gap: 1rem;
+
+  .light-two {
+    display: grid;
+    gap: 0.5rem;
+  }
+}
+
+input[type='radio'].red {
+  accent-color: #cc3232;
+}
+
+input[type='radio'].yellow {
+  accent-color: #e7b416;
+}
+
+input[type='radio'].green {
+  accent-color: #2dc937;
+}
+
+.lights-box {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+}
+
+.radio-brightness-green {
+  opacity: var(--o, 1);
+  filter: opacity(var(--o, 1));
+  accent-color: #2dc937;
+}
+
+/* Brightness */
 .brightness-control {
   display: grid;
   gap: 0.4rem;
-  width: 220px;
+  max-width: 90%;
 }
 
 .brightness-control label {
   font-weight: 600;
 }
 
-.brightness-control input[type="range"] {
+.brightness-control input[type='range'] {
   width: 100%;
-  accent-color: #2dc937;
+  accent-color: #009443;
 }
 
 .brightness-control span {
@@ -332,5 +500,24 @@ input[type='radio'].green {
   color: #666;
 }
 
-</style
+/* Speed */
+.speed-control {
+  display: grid;
+  gap: 0.4rem;
+  width: 220px;
+}
 
+.speed-control label {
+  font-weight: 600;
+}
+
+.speed-control input[type='range'] {
+  width: 100%;
+  accent-color: #009443;
+}
+
+.speed-control span {
+  font-size: 0.9rem;
+  color: #666;
+}
+</style>
