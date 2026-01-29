@@ -153,4 +153,15 @@ const emit = defineEmits<{
   font-size: 0.9rem;
   color: #666;
 }
+
+@media (max-width: 640px) {
+  .main-controls-box {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .speed-control {
+    width: 100%;
+  }
+}
 </style>
