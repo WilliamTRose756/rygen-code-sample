@@ -17,6 +17,56 @@ const config = reactive<ConfigurationObject>({
   lightBrightness: { roadA: 2, roadB: 2 },
 })
 
+const cloneConfig = (value: ConfigurationObject): ConfigurationObject =>
+  JSON.parse(JSON.stringify(value)) as ConfigurationObject
+
+const lastSavedConfig = ref<ConfigurationObject>(cloneConfig(config))
+const isSaving = ref(false)
+const saveError = ref<string | null>(null)
+const saveSuccess = ref<string | null>(null)
+let saveSuccessTimer: number | undefined
+const hasUnsavedChanges = computed(
+  () => JSON.stringify(cloneConfig(config)) !== JSON.stringify(lastSavedConfig.value),
+)
+
+const saveConfig = async () => {
+  isSaving.value = true
+  saveError.value = null
+  saveSuccess.value = null
+  try {
+    const res = await axios.put('http://localhost:8080/config', config)
+    if (res.status < 200 || res.status >= 300) {
+      throw new Error(`Save failed with status ${res.status}`)
+    }
+    lastSavedConfig.value = cloneConfig(config)
+    saveSuccess.value = 'Settings saved.'
+    if (saveSuccessTimer !== undefined) {
+      window.clearTimeout(saveSuccessTimer)
+    }
+    saveSuccessTimer = window.setTimeout(() => {
+      saveSuccess.value = null
+      saveSuccessTimer = undefined
+    }, 1500)
+  } catch (error) {
+    Object.assign(config, cloneConfig(lastSavedConfig.value))
+    saveError.value = 'Save failed. Reverted to last saved configuration.'
+    console.error(error)
+  } finally {
+    isSaving.value = false
+  }
+}
+
+onMounted(async () => {
+  try {
+    const res = await axios.get('http://localhost:8080/config')
+    Object.assign(config, res.data)
+    lastSavedConfig.value = cloneConfig(config)
+  } catch (error) {
+    console.log(error)
+  }
+  window.addEventListener('beforeunload', handleBeforeUnload)
+})
+
 const powerOn = computed({
   get: () => config.powerOn,
   set: (v: boolean) => {
@@ -120,16 +170,22 @@ const handleActiveLightChangeTwo = () => {
   return
 }
 
-watch(powerOn, (isOn) => {
-  if (isOn) {
-    startCycle()
-    return
-  }
-  stopCycle()
-})
+watch(
+  powerOn,
+  (isOn) => {
+    if (isOn) startCycle()
+    else stopCycle()
+  },
+  { immediate: true },
+)
 
 onUnmounted(() => {
   stopCycle()
+  window.removeEventListener('beforeunload', handleBeforeUnload)
+  if (saveSuccessTimer !== undefined) {
+    window.clearTimeout(saveSuccessTimer)
+    saveSuccessTimer = undefined
+  }
 })
 
 // scale remaing time, keep in sync, and maintain timing ratio
@@ -140,6 +196,20 @@ watch(speedKey, () => {
   remainingLightTwo.value = Math.max(1, Math.round(remainingLightTwo.value * ratio))
   lastSpeedFactor.value = newFactor
 })
+
+watch(
+  config,
+  () => {
+    if (saveSuccess.value) saveSuccess.value = null
+  },
+  { deep: true },
+)
+
+const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+  if (!hasUnsavedChanges.value) return
+  event.preventDefault()
+  event.returnValue = ''
+}
 </script>
 
 <template>
@@ -329,6 +399,19 @@ watch(speedKey, () => {
           </div>
         </div>
       </div>
+    </div>
+    <div class="save-control">
+      <button
+        type="button"
+        class="save-button"
+        :disabled="isSaving || !hasUnsavedChanges"
+        @click="saveConfig"
+      >
+        {{ isSaving ? 'Saving...' : 'Save Settings' }}
+      </button>
+      <p v-if="hasUnsavedChanges" class="unsaved-warning">Unsaved changes</p>
+      <p v-if="saveSuccess" class="save-success">{{ saveSuccess }}</p>
+      <p v-if="saveError" class="save-error">{{ saveError }}</p>
     </div>
   </main>
 </template>
@@ -540,5 +623,68 @@ input[type='radio'].green {
 .speed-control span {
   font-size: 0.9rem;
   color: #666;
+}
+
+/* Save button */
+.save-control {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 5%;
+}
+
+.save-button {
+  padding: 0.9rem 2.2rem;
+  font-size: 1rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 10px;
+  background: #2dc937;
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(45, 201, 55, 0.25);
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
+}
+
+.save-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(45, 201, 55, 0.3);
+  background: #27b430;
+}
+
+.save-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.save-error {
+  color: #c0392b;
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.save-success {
+  color: #1e7e34;
+  background: #e7f6ec;
+  border: 1px solid #bfe7cb;
+  border-radius: 999px;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.unsaved-warning {
+  color: #7a4e00;
+  background: #fff4e5;
+  border: 1px solid #f3d3a4;
+  border-radius: 999px;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 600;
 }
 </style>
