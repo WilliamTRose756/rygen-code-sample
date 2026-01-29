@@ -1,15 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, watch, onUnmounted, onMounted, reactive } from 'vue'
 import axios from 'axios'
-
-type SpeedSetting = 'slow' | 'medium' | 'fast'
-type LightPairId = 'roadA' | 'roadB'
-
-type ConfigurationObject = {
-  powerOn: boolean
-  speed: SpeedSetting
-  lightBrightness: Record<LightPairId, number> //1-3
-}
+import MainControls from './components/MainControls.vue'
+import LightPair from './components/LightPair.vue'
+import ConfigModal from './components/ConfigModal.vue'
+import type { LightColor, ConfigurationObject } from './types'
 
 const config = reactive<ConfigurationObject>({
   powerOn: true,
@@ -105,7 +100,6 @@ const speedSetting = computed({
 })
 
 const colors = ['green', 'yellow', 'red'] as const
-type LightColor = (typeof colors)[number]
 const activeLight = ref<LightColor>('green')
 const activeLightTwo = ref<LightColor>('red')
 const powerLabel = computed(() => (powerOn.value ? 'ON' : 'OFF'))
@@ -140,11 +134,6 @@ const remainingLightTwo = ref<number>(getDurationSeconds(activeLightTwo.value))
 const tickMs = 1000
 let cycleTimer: number | undefined
 
-const brightnessToOpacity = (level: number) => {
-  if (level <= 1) return 0.4
-  if (level === 2) return 0.7
-  return 1
-}
 // Iterate over  light cycle
 const advanceLight = (current: LightColor) => {
   const currentIndex = colors.indexOf(current)
@@ -178,19 +167,6 @@ const stopCycle = () => {
   if (cycleTimer === undefined) return
   window.clearInterval(cycleTimer)
   cycleTimer = undefined
-}
-
-const handleActiveLightChange = () => {
-  if (!powerOn.value) return
-
-  axios
-    .post('http://localhost:8080/intersections', { activeLight: activeLight.value })
-    .then(console.log)
-    .catch(console.error)
-}
-
-const handleActiveLightChangeTwo = () => {
-  return
 }
 
 watch(
@@ -248,186 +224,39 @@ const handleBeforeUnload = (event: BeforeUnloadEvent) => {
         Current Saved Configuration
       </button>
     </div>
+
     <div class="main-controls">
-      <label class="main-controls-label" style="margin-bottom: 5%" for="main-controls"
-        >Main Controls:</label
-      >
-      <div class="main-controls-box">
-        <div class="power-control">
-          <label class="switch">
-            <input type="checkbox" v-model="powerOn" />
-            <span class="slider"></span>
-          </label>
-          <span class="power-label">Power: {{ powerLabel }}</span>
-        </div>
-        <div class="speed-control">
-          <div class="speed-control">
-            <label>
-              Speed (Slow, Medium, Fast)
-              <input type="range" min="1" max="3" step="1" v-model.number="speedSetting" />
-            </label>
-          </div>
-        </div>
-      </div>
+      <MainControls
+        v-model:powerOn="powerOn"
+        v-model:speedSetting="speedSetting"
+        :powerLabel="powerLabel"
+      />
     </div>
+
     <div class="light-controllers-div">
-      <label class="main-controls-label">Lights:</label>
+      <label class="light-controllers-label">Lights:</label>
       <div class="lights-box">
-        <div class="light-column">
-          <div class="brightness-control">
-            <label>
-              Brightness (1–3):
-              <input
-                type="range"
-                min="1"
-                max="3"
-                step="1"
-                v-model.number="config.lightBrightness.roadA"
-              />
-            </label>
-          </div>
-          <div class="light-controller">
-            <p>Light Pair One</p>
-            <div class="light">
-              <label>
-                <input
-                  :style="{
-                    opacity:
-                      powerOn && activeLight === 'red'
-                        ? brightnessToOpacity(config.lightBrightness.roadA)
-                        : 1,
-                  }"
-                  type="radio"
-                  value="red"
-                  class="red"
-                  v-model="activeLight"
-                  name="light"
-                  @change="handleActiveLightChange"
-                  :disabled="!powerOn"
-                  @click.prevent
-                />
-                Red
-              </label>
-              <label>
-                <input
-                  :style="{
-                    opacity:
-                      powerOn && activeLight === 'yellow'
-                        ? brightnessToOpacity(config.lightBrightness.roadA)
-                        : 1,
-                  }"
-                  type="radio"
-                  value="yellow"
-                  class="yellow"
-                  v-model="activeLight"
-                  name="light"
-                  @change="handleActiveLightChange"
-                  :disabled="!powerOn"
-                  @click.prevent
-                />
-                Yellow
-              </label>
-              <label>
-                <input
-                  class="radio-brightness-green"
-                  :style="{
-                    opacity:
-                      powerOn && activeLight === 'green'
-                        ? brightnessToOpacity(config.lightBrightness.roadA)
-                        : 1,
-                  }"
-                  type="radio"
-                  value="green"
-                  v-model="activeLight"
-                  name="light"
-                  @change="handleActiveLightChange"
-                  :disabled="!powerOn"
-                  @click.prevent
-                />
-                Green
-              </label>
-            </div>
-          </div>
-        </div>
-        <div></div>
-        <div class="light-column">
-          <div class="brightness-control">
-            <label>
-              Brightness (1–3):
-              <input
-                type="range"
-                min="1"
-                max="3"
-                step="1"
-                v-model.number="config.lightBrightness.roadB"
-              />
-            </label>
-          </div>
-          <div class="light-two-controller">
-            <p>Light Pair Two</p>
-            <div class="light-two">
-              <label>
-                <input
-                  :style="{
-                    opacity:
-                      powerOn && activeLightTwo === 'red'
-                        ? brightnessToOpacity(config.lightBrightness.roadB)
-                        : 1,
-                  }"
-                  type="radio"
-                  value="red"
-                  class="red"
-                  v-model="activeLightTwo"
-                  name="lightTwo"
-                  @change="handleActiveLightChange"
-                  :disabled="!powerOn"
-                  @click.prevent
-                />
-                Red
-              </label>
-              <label>
-                <input
-                  :style="{
-                    opacity:
-                      powerOn && activeLightTwo === 'yellow'
-                        ? brightnessToOpacity(config.lightBrightness.roadB)
-                        : 1,
-                  }"
-                  type="radio"
-                  value="yellow"
-                  class="yellow"
-                  v-model="activeLightTwo"
-                  name="lightTwo"
-                  @change="handleActiveLightChange"
-                  :disabled="!powerOn"
-                  @click.prevent
-                />
-                Yellow
-              </label>
-              <label>
-                <input
-                  class="radio-brightness-green"
-                  :style="{
-                    opacity:
-                      powerOn && activeLightTwo === 'green'
-                        ? brightnessToOpacity(config.lightBrightness.roadB)
-                        : 1,
-                  }"
-                  type="radio"
-                  value="green"
-                  v-model="activeLightTwo"
-                  name="lightTwo"
-                  @change="handleActiveLightChange"
-                  :disabled="!powerOn"
-                  @click.prevent
-                />
-                Green
-              </label>
-            </div>
-          </div>
-        </div>
+        <LightPair
+          title="Light Pair One"
+          groupName="light"
+          :powerOn="powerOn"
+          :brightness="config.lightBrightness.roadA"
+          :activeLight="activeLight"
+          @update:brightness="(v) => (config.lightBrightness.roadA = v)"
+          @update:activeLight="(v) => (activeLight = v)"
+        />
+        <LightPair
+          title="Light Pair Two"
+          groupName="lightTwo"
+          :powerOn="powerOn"
+          :brightness="config.lightBrightness.roadB"
+          :activeLight="activeLightTwo"
+          @update:brightness="(v) => (config.lightBrightness.roadB = v)"
+          @update:activeLight="(v) => (activeLightTwo = v)"
+        />
       </div>
     </div>
+
     <div class="save-control">
       <button
         type="button"
@@ -442,35 +271,14 @@ const handleBeforeUnload = (event: BeforeUnloadEvent) => {
       <p v-if="saveError" class="save-error">{{ saveError }}</p>
     </div>
 
-    <div v-if="showConfigModal" class="modal-backdrop" @click.self="closeConfigModal">
-      <div class="modal-card">
-        <div class="modal-header">
-          <h2>Current Saved Configuration</h2>
-          <button type="button" class="modal-close" @click="closeConfigModal">×</button>
-        </div>
-        <div class="modal-body">
-          <p v-if="modalLoading">Loading...</p>
-          <p v-else-if="modalError" class="save-error">{{ modalError }}</p>
-          <div v-else-if="modalConfig" class="modal-grid">
-            <div>
-              <span class="modal-label">Power</span>
-              <span>{{ modalConfig.powerOn ? 'ON' : 'OFF' }}</span>
-            </div>
-            <div>
-              <span class="modal-label">Speed</span>
-              <span>{{ modalConfig.speed }}</span>
-            </div>
-            <div>
-              <span class="modal-label">Road A Brightness</span>
-              <span>{{ modalConfig.lightBrightness.roadA }}</span>
-            </div>
-            <div>
-              <span class="modal-label">Road B Brightness</span>
-              <span>{{ modalConfig.lightBrightness.roadB }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div class="config-modal">
+      <ConfigModal
+        v-if="showConfigModal"
+        :loading="modalLoading"
+        :error="modalError"
+        :config="modalConfig"
+        @close="closeConfigModal"
+      />
     </div>
   </main>
 </template>
@@ -483,11 +291,6 @@ header {
   text-align: center;
 }
 
-.logo {
-  display: block;
-  margin: 0 auto 2rem;
-}
-
 @media (min-width: 1024px) {
   header {
     margin: calc(var(--section-gap) / 4);
@@ -497,88 +300,6 @@ header {
     text-align: center;
   }
 }
-
-/* Main Controls Box */
-.main-controls {
-  display: flex;
-  flex-direction: column;
-  margin-bottom: 10%;
-  background: #fff;
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.12),
-    0 1px 2px rgba(0, 0, 0, 0.24);
-}
-.main-controls-label {
-  font-family: inherit;
-  font-size: 1.1rem;
-  font-weight: 600;
-  margin-bottom: 5%;
-}
-
-.main-controls-box {
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-}
-
-/* Power Switch */
-.power-control {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 1.5rem;
-}
-
-.power-label {
-  font-weight: 600;
-}
-
-.switch {
-  position: relative;
-  display: inline-block;
-  width: 56px;
-  height: 28px;
-}
-
-.switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.slider {
-  position: absolute;
-  cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: #c7c7c7;
-  transition: 0.2s;
-  border-radius: 999px;
-}
-
-.slider::before {
-  position: absolute;
-  content: '';
-  height: 22px;
-  width: 22px;
-  left: 3px;
-  bottom: 3px;
-  background-color: white;
-  transition: 0.2s;
-  border-radius: 50%;
-}
-.switch input:checked + .slider {
-  background-color: #2dc937;
-}
-
-.switch input:checked + .slider::before {
-  transform: translateX(28px);
-}
-
 /* Lights Box */
 .light-controllers-div {
   display: flex;
@@ -591,117 +312,17 @@ header {
     0 1px 2px rgba(0, 0, 0, 0.24);
 }
 
-/* Lights */
-
-.lights-column {
-  max-width: 50%;
-}
-.light-controller {
-  display: grid;
-  place-items: center;
-  gap: 1rem;
-
-  .light {
-    display: grid;
-    gap: 0.5rem;
-  }
-}
-
-.light-controller p,
-.light-two-controller p {
+.light-controllers-label {
+  font-family: inherit;
+  font-size: 1.1rem;
   font-weight: 600;
-}
-
-.light-two-controller {
-  display: grid;
-  place-items: center;
-  gap: 1rem;
-
-  .light-two {
-    display: grid;
-    gap: 0.5rem;
-  }
-}
-
-.light label,
-.light-two label {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.55rem;
-  line-height: 1.1;
-}
-
-input[type='radio'] {
-  margin: 0;
-  /* transform: scale(1.15); */
-  transform: scale(1.3);
-  transform-origin: center;
-}
-
-input[type='radio'].red {
-  accent-color: #cc3232;
-}
-
-input[type='radio'].yellow {
-  accent-color: #e7b416;
-}
-
-input[type='radio'].green {
-  accent-color: #2dc937;
+  margin-bottom: 5%;
 }
 
 .lights-box {
   display: flex;
   flex-direction: row;
   justify-content: space-between;
-}
-
-.radio-brightness-green {
-  opacity: var(--o, 1);
-  filter: opacity(var(--o, 1));
-  accent-color: #2dc937;
-}
-
-/* Brightness */
-.brightness-control {
-  display: grid;
-  gap: 0.4rem;
-  max-width: 90%;
-}
-
-.brightness-control label {
-  font-weight: 600;
-}
-
-.brightness-control input[type='range'] {
-  width: 100%;
-  accent-color: #009443;
-}
-
-.brightness-control span {
-  font-size: 0.9rem;
-  color: #666;
-}
-
-/* Speed */
-.speed-control {
-  display: grid;
-  gap: 0.4rem;
-  width: 220px;
-}
-
-.speed-control label {
-  font-weight: 600;
-}
-
-.speed-control input[type='range'] {
-  width: 100%;
-  accent-color: #009443;
-}
-
-.speed-control span {
-  font-size: 0.9rem;
-  color: #666;
 }
 
 /* Current config button */
@@ -794,67 +415,5 @@ input[type='radio'].green {
   padding: 0.35rem 0.9rem;
   font-size: 0.85rem;
   font-weight: 600;
-}
-
-/* Modal */
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.35);
-  display: grid;
-  place-items: center;
-  z-index: 50;
-}
-
-.modal-card {
-  background: #fff;
-  border-radius: 12px;
-  padding: 20px 22px;
-  width: min(420px, 90vw);
-  box-shadow:
-    0 8px 24px rgba(0, 0, 0, 0.18),
-    0 2px 6px rgba(0, 0, 0, 0.12);
-}
-
-.modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.modal-header h2 {
-  font-size: 1.1rem;
-  margin: 0;
-}
-
-.modal-close {
-  border: none;
-  background: transparent;
-  font-size: 1.5rem;
-  line-height: 1;
-  cursor: pointer;
-  color: #666;
-}
-
-.modal-body {
-  display: grid;
-  gap: 10px;
-}
-
-.modal-grid {
-  display: grid;
-  gap: 10px;
-}
-
-.modal-grid > div {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.modal-label {
-  font-weight: 600;
-  color: #4a5568;
 }
 </style>
